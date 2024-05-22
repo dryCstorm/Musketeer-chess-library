@@ -603,7 +603,7 @@ class Piece:
         return self.piece_type + (-1 if self.color else 5)
 
     def __repr__(self) -> str:
-        return f"Piece.from_symbol({self.symbol()!r})"
+        return f"Piece.from_symbol({self.board}, {self.symbol()!r})"
 
     def __str__(self) -> str:
         return self.symbol()
@@ -613,13 +613,13 @@ class Piece:
         return chess.svg.piece(self, size=45)
 
     @classmethod
-    def from_symbol(cls, symbol: str) -> Piece:
+    def from_symbol(cls, board: BaseBoard, symbol: str) -> Piece:
         """
         Creates a :class:`~chess.Piece` instance from a piece symbol.
 
         :raises: :exc:`ValueError` if the symbol is invalid.
         """
-        return cls(cls.board.PIECE_SYMBOLS.index(symbol.lower()), symbol.isupper())
+        return cls(board, board.PIECE_SYMBOLS.index(symbol.lower()), symbol.isupper())
 
 
 @dataclasses.dataclass(unsafe_hash=True)
@@ -675,7 +675,7 @@ class Move:
         return self.uci()
 
     @classmethod
-    def from_uci(cls, uci: str) -> Move:
+    def from_uci(cls, board: BaseBoard, uci: str) -> Move:
         """
         Parses a UCI string.
 
@@ -685,7 +685,7 @@ class Move:
             return cls.null()
         elif len(uci) == 4 and "@" == uci[1]:
             try:
-                drop = cls.board.PIECE_SYMBOLS.index(uci[0].lower())
+                drop = board.PIECE_SYMBOLS.index(uci[0].lower())
                 square = SQUARE_NAMES.index(uci[2:])
             except ValueError:
                 raise InvalidMoveError(f"invalid uci: {uci!r}")
@@ -694,12 +694,12 @@ class Move:
             try:
                 from_square = SQUARE_NAMES.index(uci[0:2])
                 to_square = SQUARE_NAMES.index(uci[2:4])
-                promotion = cls.board.PIECE_SYMBOLS.index(uci[4]) if len(uci) == 5 else None
+                promotion = board.PIECE_SYMBOLS.index(uci[4]) if len(uci) == 5 else None
             except ValueError:
                 raise InvalidMoveError(f"invalid uci: {uci!r}")
             if from_square == to_square:
                 raise InvalidMoveError(f"invalid uci (use 0000 for null moves): {uci!r}")
-            return cls(from_square, to_square, promotion=promotion)
+            return cls(board, from_square, to_square, promotion=promotion)
         else:
             raise InvalidMoveError(f"expected uci string to be of length 4 or 5: {uci!r}")
 
@@ -1157,7 +1157,7 @@ class BaseBoard:
             if c in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                 square_index += int(c)
             elif c.lower() in self.PIECE_SYMBOLS:
-                piece = Piece.from_symbol(c)
+                piece = Piece.from_symbol(self, c)
                 self._set_piece_at(SQUARES_180[square_index], piece.piece_type, piece.color)
                 square_index += 1
             elif c == "~":
