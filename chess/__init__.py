@@ -45,15 +45,6 @@ BISHOP: PieceType = 3
 ROOK: PieceType = 4
 QUEEN: PieceType = 5
 KING: PieceType = 6
-PIECE_TYPES: List[PieceType] = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING]
-PIECE_SYMBOLS = [None, "p", "n", "b", "r", "q", "k"]
-PIECE_NAMES = [None, "pawn", "knight", "bishop", "rook", "queen", "king"]
-
-def piece_symbol(piece_type: PieceType) -> str:
-    return typing.cast(str, PIECE_SYMBOLS[piece_type])
-
-def piece_name(piece_type: PieceType) -> str:
-    return typing.cast(str, PIECE_NAMES[piece_type])
 
 UNICODE_PIECE_SYMBOLS = {
     "R": "♖", "r": "♜",
@@ -586,7 +577,7 @@ FEN_CASTLING_REGEX = re.compile(r"^(?:-|[KQABCDEFGH]{0,2}[kqabcdefgh]{0,2})\Z")
 @dataclasses.dataclass
 class Piece:
     """A piece with type and color."""
-
+    board: BaseBoard
     piece_type: PieceType
     """The piece type."""
 
@@ -598,7 +589,7 @@ class Piece:
         Gets the symbol ``P``, ``N``, ``B``, ``R``, ``Q`` or ``K`` for white
         pieces or the lower-case variants for the black pieces.
         """
-        symbol = piece_symbol(self.piece_type)
+        symbol = self.board.piece_symbol(self.piece_type)
         return symbol.upper() if self.color else symbol
 
     def unicode_symbol(self, *, invert_color: bool = False) -> str:
@@ -628,7 +619,7 @@ class Piece:
 
         :raises: :exc:`ValueError` if the symbol is invalid.
         """
-        return cls(PIECE_SYMBOLS.index(symbol.lower()), symbol.isupper())
+        return cls(cls.board.PIECE_SYMBOLS.index(symbol.lower()), symbol.isupper())
 
 
 @dataclasses.dataclass(unsafe_hash=True)
@@ -639,7 +630,8 @@ class Move:
 
     Drops and null moves are supported.
     """
-
+    board: BaseBoard
+    
     from_square: Square
     """The source square."""
 
@@ -662,9 +654,9 @@ class Move:
         The UCI representation of a null move is ``0000``.
         """
         if self.drop:
-            return piece_symbol(self.drop).upper() + "@" + SQUARE_NAMES[self.to_square]
+            return self.board.piece_symbol(self.drop).upper() + "@" + SQUARE_NAMES[self.to_square]
         elif self.promotion:
-            return SQUARE_NAMES[self.from_square] + SQUARE_NAMES[self.to_square] + piece_symbol(self.promotion)
+            return SQUARE_NAMES[self.from_square] + SQUARE_NAMES[self.to_square] + self.board.piece_symbol(self.promotion)
         elif self:
             return SQUARE_NAMES[self.from_square] + SQUARE_NAMES[self.to_square]
         else:
@@ -693,7 +685,7 @@ class Move:
             return cls.null()
         elif len(uci) == 4 and "@" == uci[1]:
             try:
-                drop = PIECE_SYMBOLS.index(uci[0].lower())
+                drop = cls.board.PIECE_SYMBOLS.index(uci[0].lower())
                 square = SQUARE_NAMES.index(uci[2:])
             except ValueError:
                 raise InvalidMoveError(f"invalid uci: {uci!r}")
@@ -702,7 +694,7 @@ class Move:
             try:
                 from_square = SQUARE_NAMES.index(uci[0:2])
                 to_square = SQUARE_NAMES.index(uci[2:4])
-                promotion = PIECE_SYMBOLS.index(uci[4]) if len(uci) == 5 else None
+                promotion = cls.board.PIECE_SYMBOLS.index(uci[4]) if len(uci) == 5 else None
             except ValueError:
                 raise InvalidMoveError(f"invalid uci: {uci!r}")
             if from_square == to_square:
@@ -739,6 +731,16 @@ class BaseBoard:
     otherwise specified in the optional *board_fen* argument. If *board_fen*
     is ``None``, an empty board is created.
     """
+    # ================================================================================    
+    PIECE_TYPES: List[PieceType] = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING]
+    PIECE_SYMBOLS = [None, "p", "n", "b", "r", "q", "k"]
+    PIECE_NAMES = [None, "pawn", "knight", "bishop", "rook", "queen", "king"]
+    def piece_symbol(self, piece_type: PieceType) -> str:
+        return typing.cast(str, self.PIECE_SYMBOLS[piece_type])
+
+    def piece_name(self, piece_type: PieceType) -> str:
+        return typing.cast(str, self.PIECE_NAMES[piece_type])
+    # ================================================================================
 
     def __init__(self, board_fen: Optional[str] = STARTING_BOARD_FEN) -> None:
         self.occupied_co = [BB_EMPTY, BB_EMPTY]
@@ -828,7 +830,7 @@ class BaseBoard:
         if piece_type:
             mask = BB_SQUARES[square]
             color = bool(self.occupied_co[WHITE] & mask)
-            return Piece(piece_type, color)
+            return Piece(self, piece_type, color) # Updated so that Piece has its parent Board
         else:
             return None
 
@@ -1034,7 +1036,7 @@ class BaseBoard:
         """
         color = bool(self.occupied_co[WHITE] & BB_SQUARES[square])
         piece_type = self._remove_piece_at(square)
-        return Piece(piece_type, color) if piece_type else None
+        return Piece(self, piece_type, color) if piece_type else None
 
     def _set_piece_at(self, square: Square, piece_type: PieceType, color: Color, promoted: bool = False) -> None:
         self._remove_piece_at(square)
@@ -1136,7 +1138,7 @@ class BaseBoard:
                         raise ValueError(f"'~' not after piece in position part of fen: {fen!r}")
                     previous_was_digit = False
                     previous_was_piece = False
-                elif c.lower() in PIECE_SYMBOLS:
+                elif c.lower() in self.PIECE_SYMBOLS:
                     field_sum += 1
                     previous_was_digit = False
                     previous_was_piece = True
@@ -1154,7 +1156,7 @@ class BaseBoard:
         for c in fen:
             if c in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                 square_index += int(c)
-            elif c.lower() in PIECE_SYMBOLS:
+            elif c.lower() in self.PIECE_SYMBOLS:
                 piece = Piece.from_symbol(c)
                 self._set_piece_at(SQUARES_180[square_index], piece.piece_type, piece.color)
                 square_index += 1
@@ -1602,6 +1604,7 @@ class Board(BaseBoard):
         Use :func:`~chess.Board.is_valid()` to detect invalid positions.
     """
 
+
     aliases: ClassVar[List[str]] = ["Standard", "Chess", "Classical", "Normal", "Illegal", "From Position"]
     uci_variant: ClassVar[Optional[str]] = "chess"
     xboard_variant: ClassVar[Optional[str]] = "normal"
@@ -1811,7 +1814,7 @@ class Board(BaseBoard):
         for from_square in scan_reversed(non_pawns):
             moves = self.attacks_mask(from_square) & ~our_pieces & to_mask
             for to_square in scan_reversed(moves):
-                yield Move(from_square, to_square)
+                yield Move(self, from_square, to_square)
 
         # Generate castling moves.
         if from_mask & self.kings:
@@ -1831,12 +1834,12 @@ class Board(BaseBoard):
 
             for to_square in scan_reversed(targets):
                 if square_rank(to_square) in [0, 7]:
-                    yield Move(from_square, to_square, QUEEN)
-                    yield Move(from_square, to_square, ROOK)
-                    yield Move(from_square, to_square, BISHOP)
-                    yield Move(from_square, to_square, KNIGHT)
+                    yield Move(self, from_square, to_square, QUEEN)
+                    yield Move(self, from_square, to_square, ROOK)
+                    yield Move(self, from_square, to_square, BISHOP)
+                    yield Move(self, from_square, to_square, KNIGHT)
                 else:
-                    yield Move(from_square, to_square)
+                    yield Move(self, from_square, to_square)
 
         # Prepare pawn advance generation.
         if self.turn == WHITE:
@@ -1854,17 +1857,17 @@ class Board(BaseBoard):
             from_square = to_square + (8 if self.turn == BLACK else -8)
 
             if square_rank(to_square) in [0, 7]:
-                yield Move(from_square, to_square, QUEEN)
-                yield Move(from_square, to_square, ROOK)
-                yield Move(from_square, to_square, BISHOP)
-                yield Move(from_square, to_square, KNIGHT)
+                yield Move(self, from_square, to_square, QUEEN)
+                yield Move(self, from_square, to_square, ROOK)
+                yield Move(self, from_square, to_square, BISHOP)
+                yield Move(self, from_square, to_square, KNIGHT)
             else:
-                yield Move(from_square, to_square)
+                yield Move(self, from_square, to_square)
 
         # Generate double pawn moves.
         for to_square in scan_reversed(double_moves):
             from_square = to_square + (16 if self.turn == BLACK else -16)
-            yield Move(from_square, to_square)
+            yield Move(self, from_square, to_square)
 
         # Generate en passant captures.
         if self.ep_square:
@@ -1883,7 +1886,7 @@ class Board(BaseBoard):
             BB_RANKS[4 if self.turn else 3])
 
         for capturer in scan_reversed(capturers):
-            yield Move(capturer, self.ep_square)
+            yield Move(self, capturer, self.ep_square)
 
     def generate_pseudo_legal_captures(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
         return itertools.chain(
@@ -3015,7 +3018,7 @@ class Board(BaseBoard):
         if move.drop:
             san = ""
             if move.drop != PAWN:
-                san = piece_symbol(move.drop).upper()
+                san = self.piece_symbol(move.drop).upper()
             san += "@" + SQUARE_NAMES[move.to_square]
             return san
 
@@ -3033,7 +3036,7 @@ class Board(BaseBoard):
         if piece_type == PAWN:
             san = ""
         else:
-            san = piece_symbol(piece_type).upper()
+            san = self.piece_symbol(piece_type).upper()
 
         if long:
             san += SQUARE_NAMES[move.from_square]
@@ -3078,7 +3081,7 @@ class Board(BaseBoard):
 
         # Promotion.
         if move.promotion:
-            san += "=" + piece_symbol(move.promotion).upper()
+            san += "=" + self.piece_symbol(move.promotion).upper()
 
         return san
 
@@ -3152,7 +3155,7 @@ class Board(BaseBoard):
 
         # Get the promotion piece type.
         p = match.group(5)
-        promotion = PIECE_SYMBOLS.index(p[-1].lower()) if p else None
+        promotion = self.PIECE_SYMBOLS.index(p[-1].lower()) if p else None
 
         # Filter by original square.
         from_mask = BB_ALL
@@ -3165,7 +3168,7 @@ class Board(BaseBoard):
 
         # Filter by piece type.
         if match.group(1):
-            piece_type = PIECE_SYMBOLS.index(match.group(1).lower())
+            piece_type = self.PIECE_SYMBOLS.index(match.group(1).lower())
             from_mask &= self.pieces_mask(piece_type, self.turn)
         elif match.group(2) and match.group(3):
             # Allow fully specified moves, even if they are not pawn moves,
@@ -3673,7 +3676,7 @@ class Board(BaseBoard):
 
         if BB_SQUARES[king] & from_mask:
             for to_square in scan_reversed(BB_KING_ATTACKS[king] & ~self.occupied_co[self.turn] & ~attacked & to_mask):
-                yield Move(king, to_square)
+                yield Move(self, king, to_square)
 
         checker = msb(checkers)
         if BB_SQUARES[checker] == checkers:
@@ -3759,28 +3762,28 @@ class Board(BaseBoard):
         if not chess960 and promotion is None and drop is None:
             if from_square == E1 and self.kings & BB_E1:
                 if to_square == H1:
-                    return Move(E1, G1)
+                    return Move(self, E1, G1)
                 elif to_square == A1:
-                    return Move(E1, C1)
+                    return Move(self, E1, C1)
             elif from_square == E8 and self.kings & BB_E8:
                 if to_square == H8:
-                    return Move(E8, G8)
+                    return Move(self, E8, G8)
                 elif to_square == A8:
-                    return Move(E8, C8)
+                    return Move(self, E8, C8)
 
-        return Move(from_square, to_square, promotion, drop)
+        return Move(self, from_square, to_square, promotion, drop)
 
     def _to_chess960(self, move: Move) -> Move:
         if move.from_square == E1 and self.kings & BB_E1:
             if move.to_square == G1 and not self.rooks & BB_G1:
-                return Move(E1, H1)
+                return Move(self, E1, H1)
             elif move.to_square == C1 and not self.rooks & BB_C1:
-                return Move(E1, A1)
+                return Move(self, E1, A1)
         elif move.from_square == E8 and self.kings & BB_E8:
             if move.to_square == G8 and not self.rooks & BB_G8:
-                return Move(E8, H8)
+                return Move(self, E8, H8)
             elif move.to_square == C8 and not self.rooks & BB_C8:
-                return Move(E8, A8)
+                return Move(self, E8, A8)
 
         return move
 

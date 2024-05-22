@@ -1071,3 +1071,4 @@ def find_variant(name: str) -> Type[chess.Board]:
         if any(alias.lower() == name.lower() for alias in variant.aliases):
             return variant
     raise ValueError(f"unsupported variant: {name}")
+
