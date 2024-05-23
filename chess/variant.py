@@ -72,7 +72,7 @@ class SuicideBoard(chess.Board):
             return False
         elif not self.occupied_co[not color]:
             return True
-        elif self.occupied == self.bishops:
+        elif self.occupied == self.pieces [3]:
             # In a position with only bishops, check if all our bishops can be
             # captured.
             we_some_on_light = bool(self.occupied_co[color] & chess.BB_LIGHT_SQUARES)
@@ -80,7 +80,7 @@ class SuicideBoard(chess.Board):
             they_all_on_dark = not (self.occupied_co[not color] & chess.BB_LIGHT_SQUARES)
             they_all_on_light = not (self.occupied_co[not color] & chess.BB_DARK_SQUARES)
             return (we_some_on_light and they_all_on_dark) or (we_some_on_dark and they_all_on_light)
-        elif self.occupied == self.knights and chess.popcount(self.knights) == 2:
+        elif self.occupied == self.pieces [2] and chess.popcount(self.pieces [2]) == 2:
             return (
                 self.turn == color ^
                 bool(self.occupied_co[chess.WHITE] & chess.BB_LIGHT_SQUARES) ^
@@ -125,7 +125,7 @@ class SuicideBoard(chess.Board):
 
     def _transposition_key(self) -> Hashable:
         if self.has_chess960_castling_rights():
-            return (super()._transposition_key(), self.kings & self.promoted)
+            return (super()._transposition_key(), self.pieces [6] & self.promoted)
         else:
             return super()._transposition_key()
 
@@ -195,71 +195,71 @@ class AtomicBoard(chess.Board):
     connected_kings = True
 
     def is_variant_end(self) -> bool:
-        return not all(self.kings & side for side in self.occupied_co)
+        return not all(self.pieces [6] & side for side in self.occupied_co)
 
     def is_variant_win(self) -> bool:
-        return bool(self.kings and not self.kings & self.occupied_co[not self.turn])
+        return bool(self.pieces [6] and not self.pieces [6] & self.occupied_co[not self.turn])
 
     def is_variant_loss(self) -> bool:
-        return bool(self.kings and not self.kings & self.occupied_co[self.turn])
+        return bool(self.pieces [6] and not self.pieces [6] & self.occupied_co[self.turn])
 
     def has_insufficient_material(self, color: chess.Color) -> bool:
         # Remaining material does not matter if opponent's king is already
         # exploded.
-        if not (self.occupied_co[not color] & self.kings):
+        if not (self.occupied_co[not color] & self.pieces [6]):
             return False
 
         # Bare king can not mate.
-        if not (self.occupied_co[color] & ~self.kings):
+        if not (self.occupied_co[color] & ~self.pieces [6]):
             return True
 
         # As long as the opponent's king is not alone, there is always a chance
         # their own pieces explode next to it.
-        if self.occupied_co[not color] & ~self.kings:
+        if self.occupied_co[not color] & ~self.pieces [6]:
             # Unless there are only bishops that cannot explode each other.
-            if self.occupied == self.bishops | self.kings:
-                if not (self.bishops & self.occupied_co[chess.WHITE] & chess.BB_DARK_SQUARES):
-                    return not (self.bishops & self.occupied_co[chess.BLACK] & chess.BB_LIGHT_SQUARES)
-                if not (self.bishops & self.occupied_co[chess.WHITE] & chess.BB_LIGHT_SQUARES):
-                    return not (self.bishops & self.occupied_co[chess.BLACK] & chess.BB_DARK_SQUARES)
+            if self.occupied == self.pieces [3] | self.pieces [6]:
+                if not (self.pieces [3] & self.occupied_co[chess.WHITE] & chess.BB_DARK_SQUARES):
+                    return not (self.pieces [3] & self.occupied_co[chess.BLACK] & chess.BB_LIGHT_SQUARES)
+                if not (self.pieces [3] & self.occupied_co[chess.WHITE] & chess.BB_LIGHT_SQUARES):
+                    return not (self.pieces [3] & self.occupied_co[chess.BLACK] & chess.BB_DARK_SQUARES)
             return False
 
         # Queen or pawn (future queen) can give mate against bare king.
-        if self.queens or self.pawns:
+        if self.pieces [5] or self.pieces [1]:
             return False
 
         # Single knight, bishop or rook cannot mate against bare king.
-        if chess.popcount(self.knights | self.bishops | self.rooks) == 1:
+        if chess.popcount(self.pieces [2] | self.pieces [3] | self.pieces [4]) == 1:
             return True
 
         # Two knights cannot mate against bare king.
-        if self.occupied == self.knights | self.kings:
-            return chess.popcount(self.knights) <= 2
+        if self.occupied == self.pieces [2] | self.pieces [6]:
+            return chess.popcount(self.pieces [2]) <= 2
 
         return False
 
     def _attacked_for_king(self, path: chess.Bitboard, occupied: chess.Bitboard) -> bool:
         # Can castle onto attacked squares if they are connected to the
         # enemy king.
-        enemy_kings = self.kings & self.occupied_co[not self.turn]
+        enemy_kings = self.pieces [6] & self.occupied_co[not self.turn]
         for enemy_king in chess.scan_forward(enemy_kings):
             path &= ~chess.BB_KING_ATTACKS[enemy_king]
 
         return super()._attacked_for_king(path, occupied)
 
     def _kings_connected(self) -> bool:
-        white_kings = self.kings & self.occupied_co[chess.WHITE]
-        black_kings = self.kings & self.occupied_co[chess.BLACK]
+        white_kings = self.pieces [6] & self.occupied_co[chess.WHITE]
+        black_kings = self.pieces [6] & self.occupied_co[chess.BLACK]
         return any(chess.BB_KING_ATTACKS[sq] & black_kings for sq in chess.scan_forward(white_kings))
 
     def _push_capture(self, move: chess.Move, capture_square: chess.Square, piece_type: chess.PieceType, was_promoted: bool) -> None:
-        explosion_radius = chess.BB_KING_ATTACKS[move.to_square] & ~self.pawns
+        explosion_radius = chess.BB_KING_ATTACKS[move.to_square] & ~self.pieces [1]
 
         # Destroy castling rights.
         self.castling_rights &= ~explosion_radius
-        if explosion_radius & self.kings & self.occupied_co[chess.WHITE] & ~self.promoted:
+        if explosion_radius & self.pieces [6] & self.occupied_co[chess.WHITE] & ~self.promoted:
             self.castling_rights &= ~chess.BB_RANK_1
-        if explosion_radius & self.kings & self.occupied_co[chess.BLACK] & ~self.promoted:
+        if explosion_radius & self.pieces [6] & self.occupied_co[chess.BLACK] & ~self.promoted:
             self.castling_rights &= ~chess.BB_RANK_8
 
         # Explode the capturing piece.
@@ -289,7 +289,7 @@ class AtomicBoard(chess.Board):
             return False
 
         self.push(move)
-        legal = bool(self.kings) and not self.is_variant_win() and (self.is_variant_loss() or not self.was_into_check())
+        legal = bool(self.pieces [6]) and not self.is_variant_win() and (self.is_variant_loss() or not self.was_into_check())
         self.pop()
 
         return legal
@@ -328,13 +328,13 @@ class KingOfTheHillBoard(chess.Board):
     tbz_magic = None
 
     def is_variant_end(self) -> bool:
-        return bool(self.kings & chess.BB_CENTER)
+        return bool(self.pieces [6] & chess.BB_CENTER)
 
     def is_variant_win(self) -> bool:
-        return bool(self.kings & self.occupied_co[self.turn] & chess.BB_CENTER)
+        return bool(self.pieces [6] & self.occupied_co[self.turn] & chess.BB_CENTER)
 
     def is_variant_loss(self) -> bool:
-        return bool(self.kings & self.occupied_co[not self.turn] & chess.BB_CENTER)
+        return bool(self.pieces [6] & self.occupied_co[not self.turn] & chess.BB_CENTER)
 
     def has_insufficient_material(self, color: chess.Color) -> bool:
         return False
@@ -367,10 +367,10 @@ class RacingKingsBoard(chess.Board):
                 yield move
 
     def is_variant_end(self) -> bool:
-        if not self.kings & chess.BB_RANK_8:
+        if not self.pieces [6] & chess.BB_RANK_8:
             return False
 
-        black_kings = self.kings & self.occupied_co[chess.BLACK]
+        black_kings = self.pieces [6] & self.occupied_co[chess.BLACK]
         if self.turn == chess.WHITE or black_kings & chess.BB_RANK_8 or not black_kings:
             return True
 
@@ -382,14 +382,14 @@ class RacingKingsBoard(chess.Board):
         return all(self.attackers_mask(chess.WHITE, target) for target in chess.scan_forward(targets))
 
     def is_variant_draw(self) -> bool:
-        in_goal = self.kings & chess.BB_RANK_8
+        in_goal = self.pieces [6] & chess.BB_RANK_8
         return all(in_goal & side for side in self.occupied_co)
 
     def is_variant_loss(self) -> bool:
-        return self.is_variant_end() and not self.kings & self.occupied_co[self.turn] & chess.BB_RANK_8
+        return self.is_variant_end() and not self.pieces [6] & self.occupied_co[self.turn] & chess.BB_RANK_8
 
     def is_variant_win(self) -> bool:
-        in_goal = self.kings & chess.BB_RANK_8
+        in_goal = self.pieces [6] & chess.BB_RANK_8
         return (
             self.is_variant_end() and
             bool(in_goal & self.occupied_co[self.turn]) and
@@ -402,18 +402,18 @@ class RacingKingsBoard(chess.Board):
         status = super().status()
         if self.is_check():
             status |= chess.STATUS_RACE_CHECK | chess.STATUS_TOO_MANY_CHECKERS | chess.STATUS_IMPOSSIBLE_CHECK
-        if self.turn == chess.BLACK and all(self.occupied_co[co] & self.kings & chess.BB_RANK_8 for co in chess.COLORS):
+        if self.turn == chess.BLACK and all(self.occupied_co[co] & self.pieces [6] & chess.BB_RANK_8 for co in chess.COLORS):
             status |= chess.STATUS_RACE_OVER
-        if self.pawns:
+        if self.pieces [1]:
             status |= chess.STATUS_RACE_MATERIAL
         for color in chess.COLORS:
-            if chess.popcount(self.occupied_co[color] & self.knights) > 2:
+            if chess.popcount(self.occupied_co[color] & self.pieces [2]) > 2:
                 status |= chess.STATUS_RACE_MATERIAL
-            if chess.popcount(self.occupied_co[color] & self.bishops) > 2:
+            if chess.popcount(self.occupied_co[color] & self.pieces [3]) > 2:
                 status |= chess.STATUS_RACE_MATERIAL
-            if chess.popcount(self.occupied_co[color] & self.rooks) > 2:
+            if chess.popcount(self.occupied_co[color] & self.pieces [4]) > 2:
                 status |= chess.STATUS_RACE_MATERIAL
-            if chess.popcount(self.occupied_co[color] & self.queens) > 1:
+            if chess.popcount(self.occupied_co[color] & self.pieces [5]) > 1:
                 status |= chess.STATUS_RACE_MATERIAL
         return status
 
@@ -457,16 +457,16 @@ class HordeBoard(chess.Board):
         # for how the following has been derived.
 
         white = self.occupied_co[chess.WHITE]
-        queens = chess.popcount(white & self.queens)
-        pawns = chess.popcount(white & self.pawns)
-        rooks = chess.popcount(white & self.rooks)
-        bishops = chess.popcount(white & self.bishops)
-        knights = chess.popcount(white & self.knights)
+        queens = chess.popcount(white & self.pieces [5])
+        pawns = chess.popcount(white & self.pieces [1])
+        rooks = chess.popcount(white & self.pieces [4])
+        bishops = chess.popcount(white & self.pieces [3])
+        knights = chess.popcount(white & self.pieces [2])
 
         # Two same color bishops suffice to cover all the light and dark
         # squares around the enemy king.
-        horde_darkb = chess.popcount(chess.BB_DARK_SQUARES & white & self.bishops)
-        horde_lightb = chess.popcount(chess.BB_LIGHT_SQUARES & white & self.bishops)
+        horde_darkb = chess.popcount(chess.BB_DARK_SQUARES & white & self.pieces [3])
+        horde_lightb = chess.popcount(chess.BB_LIGHT_SQUARES & white & self.pieces [3])
         horde_bishop_co = chess.WHITE if horde_lightb >= 1 else chess.BLACK
         horde_num = (
             pawns + knights + rooks + queens +
@@ -475,13 +475,13 @@ class HordeBoard(chess.Board):
         )
 
         pieces = self.occupied_co[chess.BLACK]
-        pieces_pawns = chess.popcount(pieces & self.pawns)
-        pieces_bishops = chess.popcount(pieces & self.bishops)
-        pieces_knights = chess.popcount(pieces & self.knights)
-        pieces_rooks = chess.popcount(pieces & self.rooks)
-        pieces_queens = chess.popcount(pieces & self.queens)
-        pieces_darkb = chess.popcount(chess.BB_DARK_SQUARES & pieces & self.bishops)
-        pieces_lightb = chess.popcount(chess.BB_LIGHT_SQUARES & pieces & self.bishops)
+        pieces_pawns = chess.popcount(pieces & self.pieces [1])
+        pieces_bishops = chess.popcount(pieces & self.pieces [3])
+        pieces_knights = chess.popcount(pieces & self.pieces [2])
+        pieces_rooks = chess.popcount(pieces & self.pieces [4])
+        pieces_queens = chess.popcount(pieces & self.pieces [5])
+        pieces_darkb = chess.popcount(chess.BB_DARK_SQUARES & pieces & self.pieces [3])
+        pieces_lightb = chess.popcount(chess.BB_LIGHT_SQUARES & pieces & self.pieces [3])
         pieces_num = chess.popcount(pieces)
 
         def pieces_oppositeb_of(square_color: chess.Color) -> int:
@@ -536,7 +536,7 @@ class HordeBoard(chess.Board):
             elif pawns == 1:
                 # Promote the pawn to a queen or a knight and check whether
                 # white can mate.
-                pawn_square = chess.SquareSet(self.pawns & white).pop()
+                pawn_square = chess.SquareSet(self.pieces [1] & white).pop()
                 promote_to_queen = self.copy(stack=False)
                 promote_to_queen.set_piece_at(pawn_square, chess.Piece(chess.QUEEN, chess.WHITE))
                 promote_to_knight = self.copy(stack=False)
@@ -662,10 +662,10 @@ class HordeBoard(chess.Board):
             status &= ~chess.STATUS_TOO_MANY_WHITE_PIECES
             status &= ~chess.STATUS_TOO_MANY_WHITE_PAWNS
 
-        if not self.pawns & chess.BB_RANK_8 and not self.occupied_co[chess.BLACK] & self.pawns & chess.BB_RANK_1:
+        if not self.pieces [1] & chess.BB_RANK_8 and not self.occupied_co[chess.BLACK] & self.pieces [1] & chess.BB_RANK_1:
             status &= ~chess.STATUS_PAWNS_ON_BACKRANK
 
-        if self.occupied_co[chess.WHITE] & self.kings:
+        if self.occupied_co[chess.WHITE] & self.pieces [6]:
             status |= chess.STATUS_TOO_MANY_KINGS
 
         return status
@@ -720,7 +720,7 @@ class ThreeCheckBoard(chess.Board):
 
     def has_insufficient_material(self, color: chess.Color) -> bool:
         # Any remaining piece can give check.
-        return not (self.occupied_co[color] & ~self.kings)
+        return not (self.occupied_co[color] & ~self.pieces [6])
 
     def set_epd(self, epd: str) -> Dict[str, Union[None, str, int, float, chess.Move, List[chess.Move]]]:
         parts = epd.strip().rstrip(";").split(None, 5)
@@ -983,9 +983,9 @@ class CrazyhouseBoard(chess.Board):
         return (
             chess.popcount(self.occupied) + sum(len(pocket) for pocket in self.pockets) <= 3 and
             not self.promoted and
-            not self.pawns and
-            not self.rooks and
-            not self.queens and
+            not self.pieces [1] and
+            not self.pieces [4] and
+            not self.pieces [5] and
             not any(pocket.count(chess.PAWN) for pocket in self.pockets) and
             not any(pocket.count(chess.ROOK) for pocket in self.pockets) and
             not any(pocket.count(chess.QUEEN) for pocket in self.pockets))
@@ -1039,7 +1039,7 @@ class CrazyhouseBoard(chess.Board):
     def status(self) -> chess.Status:
         status = super().status()
 
-        if chess.popcount(self.pawns) + self.pockets[chess.WHITE].count(chess.PAWN) + self.pockets[chess.BLACK].count(chess.PAWN) <= 16:
+        if chess.popcount(self.pieces [1]) + self.pockets[chess.WHITE].count(chess.PAWN) + self.pockets[chess.BLACK].count(chess.PAWN) <= 16:
             status &= ~chess.STATUS_TOO_MANY_BLACK_PAWNS
             status &= ~chess.STATUS_TOO_MANY_WHITE_PAWNS
 

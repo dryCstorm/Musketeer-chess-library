@@ -1,0 +1,32 @@
+id zh-all-drop-types
+epd 2k5/8/8/8/8/8/8/4K3[QRBNPqrbnp] w - -
+perft 1 301
+perft 2 75353
+
+id zh-drops
+epd 2k5/8/8/8/8/8/8/4K3[Qn] w - -
+perft 1 67
+perft 2 3083
+perft 3 88634
+perft 4 932554
+
+id zh-middlegame
+epd r1bqk2r/pppp1ppp/2n1p3/4P3/1b1Pn3/2NB1N2/PPP2PPP/R1BQK2R[] b KQkq -
+perft 1 42
+perft 2 1347
+perft 3 58057
+perft 4 2083382
+
+id zh-promoted
+epd 4k3/1Q~6/8/8/4b3/8/Kpp5/8/ b - -
+perft 1 20
+perft 2 360
+perft 3 5445
+perft 4 132758
+
+id zh-midgame
+epd 2rn1b1r/1pp2n1p/B1PBk1pP/5p1P/P5p1/2P2RP1/RP1QNP2/1NBK4[QPp] w - -
+perft 1 99
+perft 2 3932
+perft 3 314782
+perft 4 10118606

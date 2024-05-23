@@ -444,19 +444,19 @@ def calc_key(board: chess.BaseBoard, *, mirror: bool = False) -> str:
     b = board.occupied_co[chess.BLACK ^ mirror]
 
     return "".join([
-        "K" * chess.popcount(board.kings & w),
-        "Q" * chess.popcount(board.queens & w),
-        "R" * chess.popcount(board.rooks & w),
-        "B" * chess.popcount(board.bishops & w),
-        "N" * chess.popcount(board.knights & w),
-        "P" * chess.popcount(board.pawns & w),
+        "K" * chess.popcount(board.pieces [6] & w),
+        "Q" * chess.popcount(board.pieces [5] & w),
+        "R" * chess.popcount(board.pieces [4] & w),
+        "B" * chess.popcount(board.pieces [3] & w),
+        "N" * chess.popcount(board.pieces [2] & w),
+        "P" * chess.popcount(board.pieces [1] & w),
         "v",
-        "K" * chess.popcount(board.kings & b),
-        "Q" * chess.popcount(board.queens & b),
-        "R" * chess.popcount(board.rooks & b),
-        "B" * chess.popcount(board.bishops & b),
-        "N" * chess.popcount(board.knights & b),
-        "P" * chess.popcount(board.pawns & b),
+        "K" * chess.popcount(board.pieces [6] & b),
+        "Q" * chess.popcount(board.pieces [5] & b),
+        "R" * chess.popcount(board.pieces [4] & b),
+        "B" * chess.popcount(board.pieces [3] & b),
+        "N" * chess.popcount(board.pieces [2] & b),
+        "P" * chess.popcount(board.pieces [1] & b),
     ])
 
 
@@ -1543,7 +1543,7 @@ class Tablebase:
             return -2
 
         # Test for KvK.
-        if self.variant.one_king and board.kings == board.occupied:
+        if self.variant.one_king and board.pieces [6] == board.occupied:
             return 0
 
         key = calc_key(board)
@@ -1609,7 +1609,7 @@ class Tablebase:
         threats_found = False
 
         if threats or chess.popcount(board.occupied) >= 6:
-            for threat in board.generate_legal_moves(~board.pawns):
+            for threat in board.generate_legal_moves(~board.pieces [1]):
                 board.push(threat)
                 try:
                     v_plus, captures_found = self.sprobe_capts(board, -beta, -alpha)
@@ -1738,7 +1738,7 @@ class Tablebase:
         if wdl == 0:
             return 0
 
-        if success == 2 or not board.occupied_co[board.turn] & ~board.pawns:
+        if success == 2 or not board.occupied_co[board.turn] & ~board.pieces [1]:
             return dtz_before_zeroing(wdl)
 
         if wdl > 0:
@@ -1747,7 +1747,7 @@ class Tablebase:
                 return 2 if wdl == 2 else 102
 
             # Generate all legal non-capturing pawn moves.
-            for move in board.generate_legal_moves(board.pawns, ~board.occupied):
+            for move in board.generate_legal_moves(board.pieces [1], ~board.occupied):
                 if board.is_capture(move):
                     # En passant.
                     continue
@@ -1768,7 +1768,7 @@ class Tablebase:
         if wdl > 0:
             best = 0xffff
 
-            for move in board.generate_legal_moves(~board.pawns, ~board.occupied):
+            for move in board.generate_legal_moves(~board.pieces [1], ~board.occupied):
                 board.push(move)
                 try:
                     v = -self.probe_dtz(board)
