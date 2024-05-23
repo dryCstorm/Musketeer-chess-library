@@ -1,4 +1,6 @@
 """
+"""
+"""
 A chess library with move generation and validation,
 Polyglot opening book probing, PGN reading and writing,
 Gaviota tablebase probing,
@@ -1527,6 +1529,9 @@ class _BoardState(Generic[BoardT]):
         self.ep_square = board.ep_square
         self.halfmove_clock = board.halfmove_clock
         self.fullmove_number = board.fullmove_number
+        
+        if (board.custom_params != None):
+            self.custom_params = board.custom_params.clone()
 
     def restore(self, board: BoardT) -> None:
         board.pieces = self.pieces.copy()
@@ -1542,6 +1547,9 @@ class _BoardState(Generic[BoardT]):
         board.ep_square = self.ep_square
         board.halfmove_clock = self.halfmove_clock
         board.fullmove_number = self.fullmove_number
+        
+        if (self.custom_params != None):
+            board.custom_params = self.custom_params.clone()
 
 class Board(BaseBoard):
     """
