@@ -1469,7 +1469,7 @@ class BaseBoard:
         """Creates a copy of the board."""
         board = type(self)(None)
 
-        board.pieces = self.pieces
+        board.pieces = self.pieces.copy()
 
         board.occupied_co[WHITE] = self.occupied_co[WHITE]
         board.occupied_co[BLACK] = self.occupied_co[BLACK]
@@ -1514,7 +1514,7 @@ BoardT = TypeVar("BoardT", bound="Board")
 class _BoardState(Generic[BoardT]):
 
     def __init__(self, board: BoardT) -> None:
-        self.pieces = board.pieces
+        self.pieces = board.pieces.copy()
 
         self.occupied_w = board.occupied_co[WHITE]
         self.occupied_b = board.occupied_co[BLACK]
@@ -1529,7 +1529,7 @@ class _BoardState(Generic[BoardT]):
         self.fullmove_number = board.fullmove_number
 
     def restore(self, board: BoardT) -> None:
-        board.pieces = self.pieces
+        board.pieces = self.pieces.copy()
 
         board.occupied_co[WHITE] = self.occupied_w
         board.occupied_co[BLACK] = self.occupied_b
@@ -1778,73 +1778,70 @@ class Board(BaseBoard):
 
     def generate_pseudo_legal_moves(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
         our_pieces = self.occupied_co[self.turn]
-
-        print((our_pieces & ~self.pieces [1]), from_mask)
         # Generate piece moves.
         
         non_pawns = our_pieces & ~self.pieces [1] & from_mask
         for from_square in scan_reversed(non_pawns):
             moves = self.attacks_mask(from_square) & ~our_pieces & to_mask
-            #print(moves)
             for to_square in scan_reversed(moves):
                 yield Move(self, from_square, to_square)
 
         # Generate castling moves.
-        # if from_mask & self.pieces [6]:
-        #     yield from self.generate_castling_moves(from_mask, to_mask)
+        if from_mask & self.pieces [6]:
+            yield from self.generate_castling_moves(from_mask, to_mask)
 
         # The remaining moves are all pawn moves.
-        # pawns = self.pieces [1] & self.occupied_co[self.turn] & from_mask
-        # if not pawns:
-        #     return
+        pawns = self.pieces [1] & self.occupied_co[self.turn] & from_mask
+        if not pawns:
+            return
 
         # # Generate pawn captures.
-        # capturers = pawns
-        # for from_square in scan_reversed(capturers):
-        #     targets = (
-        #         BB_PAWN_ATTACKS[self.turn][from_square] &
-        #         self.occupied_co[not self.turn] & to_mask)
+        capturers = pawns
+        for from_square in scan_reversed(capturers):
+            targets = (
+                BB_PAWN_ATTACKS[self.turn][from_square] &
+                self.occupied_co[not self.turn] & to_mask)
 
-        #     for to_square in scan_reversed(targets):
-        #         if square_rank(to_square) in [0, 7]:
-        #             yield Move(self, from_square, to_square, QUEEN)
-        #             yield Move(self, from_square, to_square, ROOK)
-        #             yield Move(self, from_square, to_square, BISHOP)
-        #             yield Move(self, from_square, to_square, KNIGHT)
-        #         else:
-        #             yield Move(self, from_square, to_square)
+            for to_square in scan_reversed(targets):
+                if square_rank(to_square) in [0, 7]:
+                    yield Move(self, from_square, to_square, QUEEN)
+                    yield Move(self, from_square, to_square, ROOK)
+                    yield Move(self, from_square, to_square, BISHOP)
+                    yield Move(self, from_square, to_square, KNIGHT)
+                else:
+                    yield Move(self, from_square, to_square)
 
-        # # Prepare pawn advance generation.
-        # if self.turn == WHITE:
-        #     single_moves = pawns << 8 & ~self.occupied
-        #     double_moves = single_moves << 8 & ~self.occupied & (BB_RANK_3 | BB_RANK_4)
-        # else:
-        #     single_moves = pawns >> 8 & ~self.occupied
-        #     double_moves = single_moves >> 8 & ~self.occupied & (BB_RANK_6 | BB_RANK_5)
+        # Prepare pawn advance generation.
+        if self.turn == WHITE:
+            single_moves = pawns << 8 & ~self.occupied
+            double_moves = single_moves << 8 & ~self.occupied & (BB_RANK_3 | BB_RANK_4)
+        else:
+            single_moves = pawns >> 8 & ~self.occupied
+            double_moves = single_moves >> 8 & ~self.occupied & (BB_RANK_6 | BB_RANK_5)
 
-        # single_moves &= to_mask
-        # double_moves &= to_mask
+        single_moves &= to_mask
+        double_moves &= to_mask
 
-        # # Generate single pawn moves.
-        # for to_square in scan_reversed(single_moves):
-        #     from_square = to_square + (8 if self.turn == BLACK else -8)
+        # Generate single pawn moves.
+        for to_square in scan_reversed(single_moves):
+            from_square = to_square + (8 if self.turn == BLACK else -8)
 
-        #     if square_rank(to_square) in [0, 7]:
-        #         yield Move(self, from_square, to_square, QUEEN)
-        #         yield Move(self, from_square, to_square, ROOK)
-        #         yield Move(self, from_square, to_square, BISHOP)
-        #         yield Move(self, from_square, to_square, KNIGHT)
-        #     else:
-        #         yield Move(self, from_square, to_square)
+            if square_rank(to_square) in [0, 7]:
+                yield Move(self, from_square, to_square, QUEEN)
+                yield Move(self, from_square, to_square, ROOK)
+                yield Move(self, from_square, to_square, BISHOP)
+                yield Move(self, from_square, to_square, KNIGHT)
+            else:
+                yield Move(self, from_square, to_square)
 
-        # # Generate double pawn moves.
-        # for to_square in scan_reversed(double_moves):
-        #     from_square = to_square + (16 if self.turn == BLACK else -16)
-        #     yield Move(self, from_square, to_square)
+        # Generate double pawn moves.
+        for to_square in scan_reversed(double_moves):
+            from_square = to_square + (16 if self.turn == BLACK else -16)
+            yield Move(self, from_square, to_square)
 
-        # # Generate en passant captures.
-        # if self.ep_square:
-        #     yield from self.generate_pseudo_legal_ep(from_mask, to_mask)
+        # Generate en passant captures.
+        if self.ep_square:
+            yield from self.generate_pseudo_legal_ep(from_mask, to_mask)
 
     def generate_pseudo_legal_ep(self, from_mask: Bitboard = BB_ALL, to_mask: Bitboard = BB_ALL) -> Iterator[Move]:
         if not self.ep_square or not BB_SQUARES[self.ep_square] & to_mask:
@@ -3021,8 +3018,9 @@ class Board(BaseBoard):
             from_mask = self.pieces_mask(piece_type, self.turn)
             from_mask &= ~BB_SQUARES[move.from_square]
             to_mask = BB_SQUARES[move.to_square]
-            print("Here it is, isn't it?")
+            a = ""
             for candidate in self.generate_legal_moves(from_mask, to_mask):
+                a = a + " " + str(candidate)
                 others |= BB_SQUARES[candidate.from_square]
 
             # Disambiguate.
@@ -3161,7 +3159,6 @@ class Board(BaseBoard):
 
         # Match legal moves.
         matched_move = None
-        print("Here it is, isn't it?")
         for move in self.generate_legal_moves(from_mask, to_mask):
             if move.promotion != promotion:
                 continue
@@ -3671,18 +3668,15 @@ class Board(BaseBoard):
         if self.is_variant_end():
             return
 
-        print("================================================================", from_mask)
         king_mask = self.pieces [6] & self.occupied_co[self.turn]
         if king_mask:
             king = msb(king_mask)
             blockers = self._slider_blockers(king)
             checkers = self.attackers_mask(not self.turn, king)
-            print(blockers, checkers)
             if checkers:
-                1
-                # for move in self._generate_evasions(king, checkers, from_mask, to_mask):
-                #     if self._is_safe(king, blockers, move):
-                #         yield move
+                for move in self._generate_evasions(king, checkers, from_mask, to_mask):
+                    if self._is_safe(king, blockers, move):
+                        yield move
             else:
                 for move in self.generate_pseudo_legal_moves(from_mask, to_mask):
                     if self._is_safe(king, blockers, move):
