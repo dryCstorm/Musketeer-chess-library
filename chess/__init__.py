@@ -7,8 +7,6 @@ Gaviota tablebase probing,
 Syzygy tablebase probing, and XBoard/UCI engine communication.
 """
 
-from __future__ import annotations
-
 __author__ = "Niklas Fiekas"
 
 __email__ = "niklas.fiekas@backscattering.de"
@@ -33,14 +31,14 @@ if typing.TYPE_CHECKING:
 EnPassantSpec = Literal["legal", "fen", "xfen"]
 
 
-Color: TypeAlias = bool
+Color = bool
 WHITE: Color = True
 BLACK: Color = False
 COLORS: List[Color] = [WHITE, BLACK]
 ColorName = Literal["white", "black"]
 COLOR_NAMES: List[ColorName] = ["black", "white"]
 
-PieceType: TypeAlias = int
+PieceType = int
 PAWN: PieceType = 1
 KNIGHT: PieceType = 2
 BISHOP: PieceType = 3
@@ -162,7 +160,7 @@ class AmbiguousMoveError(ValueError):
     """Raised when the attempted move is ambiguous in the current position"""
 
 
-Square: TypeAlias = int
+Square = int
 A1: Square = 0
 B1: Square = 1
 C1: Square = 2
@@ -293,7 +291,7 @@ def square_mirror(square: Square) -> Square:
 SQUARES_180: List[Square] = [square_mirror(sq) for sq in SQUARES]
 
 
-Bitboard: TypeAlias = int
+Bitboard = int
 BB_EMPTY: Bitboard = 0
 BB_ALL: Bitboard = 0xffff_ffff_ffff_ffff
 
@@ -586,7 +584,7 @@ FEN_CASTLING_REGEX = re.compile(r"^(?:-|[KQABCDEFGH]{0,2}[kqabcdefgh]{0,2})\Z")
 @dataclasses.dataclass
 class Piece:
     """A piece with type and color."""
-    board: BaseBoard
+    board: 'BaseBoard'
     piece_type: PieceType
     """The piece type."""
 
@@ -625,7 +623,7 @@ class Piece:
         return self.piece_type == other.piece_type and self.color == other.color
     
     @classmethod
-    def from_symbol(cls, board: BaseBoard, symbol: str) -> Piece:
+    def from_symbol(cls, board, symbol: str):
         """
         Creates a :class:`~chess.Piece` instance from a piece symbol.
 
@@ -642,7 +640,7 @@ class Move:
 
     Drops and null moves are supported.
     """
-    board: BaseBoard
+    board: 'BaseBoard'
     
     from_square: Square
     """The source square."""
@@ -690,7 +688,7 @@ class Move:
         return self.from_square == other.from_square and self.to_square == other.to_square and self.promotion == other.promotion and self.drop == other.drop
     
     @classmethod
-    def from_uci(cls, board: BaseBoard, uci: str) -> Move:
+    def from_uci(cls, board, uci: str):
         """
         Parses a UCI string.
 
@@ -719,7 +717,7 @@ class Move:
             raise InvalidMoveError(f"expected uci string to be of length 4 or 5: {uci!r}")
 
     @classmethod
-    def null(cls) -> Move:
+    def null(cls):
         """
         Gets a null move.
 
@@ -758,6 +756,7 @@ class BaseBoard:
                ATTACK_MODE_DIAG | ATTACK_MODE_RANK | ATTACK_MODE_FILE,
                ATTACK_MODE_KING]
     
+    custom_params = []
     def piece_symbol(self, piece_type: PieceType) -> str:
         return typing.cast(str, self.PIECE_SYMBOLS[piece_type])
 
@@ -830,7 +829,7 @@ class BaseBoard:
 
         return bb & self.occupied_co[color]
 
-    def pieces(self, piece_type: PieceType, color: Color) -> SquareSet:
+    def pieces(self, piece_type: PieceType, color: Color):
         """
         Gets pieces of the given type and color.
 
@@ -903,7 +902,7 @@ class BaseBoard:
                 return attacks
         return 0
 
-    def attacks(self, square: Square) -> SquareSet:
+    def attacks(self, square: Square):
         """
         Gets the set of attacked squares from the given square.
 
@@ -948,7 +947,7 @@ class BaseBoard:
         """
         return bool(self.attackers_mask(color, square))
 
-    def attackers(self, color: Color, square: Square) -> SquareSet:
+    def attackers(self, color: Color, square: Square):
         """
         Gets the set of attackers of the given color for the given square.
 
@@ -979,7 +978,7 @@ class BaseBoard:
 
         return BB_ALL
 
-    def pin(self, color: Color, square: Square) -> SquareSet:
+    def pin(self, color: Color, square: Square):
         """
         Detects an absolute pin (and its direction) of the given square to
         the king of the given color.
@@ -1530,8 +1529,7 @@ class _BoardState(Generic[BoardT]):
         self.halfmove_clock = board.halfmove_clock
         self.fullmove_number = board.fullmove_number
         
-        if (board.custom_params != None):
-            self.custom_params = board.custom_params.clone()
+        self.custom_params = board.custom_params.copy()
 
     def restore(self, board: BoardT) -> None:
         board.pieces = self.pieces.copy()
@@ -1548,8 +1546,7 @@ class _BoardState(Generic[BoardT]):
         board.halfmove_clock = self.halfmove_clock
         board.fullmove_number = self.fullmove_number
         
-        if (self.custom_params != None):
-            board.custom_params = self.custom_params.clone()
+        board.custom_params = self.custom_params.copy()
 
 class Board(BaseBoard):
     """
@@ -1679,7 +1676,7 @@ class Board(BaseBoard):
             self.set_fen(fen)
 
     @property
-    def legal_moves(self) -> LegalMoveGenerator:
+    def legal_moves(self):
         """
         A dynamic list of legal moves.
 
@@ -1700,7 +1697,7 @@ class Board(BaseBoard):
         return LegalMoveGenerator(self)
 
     @property
-    def pseudo_legal_moves(self) -> PseudoLegalMoveGenerator:
+    def pseudo_legal_moves(self):
         """
         A dynamic list of pseudo-legal moves, much like the legal move list.
 
@@ -1875,7 +1872,7 @@ class Board(BaseBoard):
         king = self.king(self.turn)
         return BB_EMPTY if king is None else self.attackers_mask(not self.turn, king)
 
-    def checkers(self) -> SquareSet:
+    def checkers(self):
         """
         Gets the pieces currently giving check.
 
@@ -3929,7 +3926,7 @@ class LegalMoveGenerator:
         return f"<LegalMoveGenerator at {id(self):#x} ({sans})>"
 
 
-IntoSquareSet: TypeAlias = Union[SupportsInt, Iterable[Square]]
+IntoSquareSet = Union[SupportsInt, Iterable[Square]]
 
 class SquareSet:
     """
@@ -4059,39 +4056,39 @@ class SquareSet:
         """Tests if this square set is a superset of another."""
         return not bool(~self & other)
 
-    def union(self, other: IntoSquareSet) -> SquareSet:
+    def union(self, other: IntoSquareSet):
         return self | other
 
-    def __or__(self, other: IntoSquareSet) -> SquareSet:
+    def __or__(self, other: IntoSquareSet):
         r = SquareSet(other)
         r.mask |= self.mask
         return r
 
-    def intersection(self, other: IntoSquareSet) -> SquareSet:
+    def intersection(self, other: IntoSquareSet):
         return self & other
 
-    def __and__(self, other: IntoSquareSet) -> SquareSet:
+    def __and__(self, other: IntoSquareSet):
         r = SquareSet(other)
         r.mask &= self.mask
         return r
 
-    def difference(self, other: IntoSquareSet) -> SquareSet:
+    def difference(self, other: IntoSquareSet):
         return self - other
 
-    def __sub__(self, other: IntoSquareSet) -> SquareSet:
+    def __sub__(self, other: IntoSquareSet):
         r = SquareSet(other)
         r.mask = self.mask & ~r.mask
         return r
 
-    def symmetric_difference(self, other: IntoSquareSet) -> SquareSet:
+    def symmetric_difference(self, other: IntoSquareSet):
         return self ^ other
 
-    def __xor__(self, other: IntoSquareSet) -> SquareSet:
+    def __xor__(self, other: IntoSquareSet):
         r = SquareSet(other)
         r.mask ^= self.mask
         return r
 
-    def copy(self) -> SquareSet:
+    def copy(self):
         return SquareSet(self.mask)
 
     # set
@@ -4100,7 +4097,7 @@ class SquareSet:
         for other in others:
             self |= other
 
-    def __ior__(self, other: IntoSquareSet) -> SquareSet:
+    def __ior__(self, other: IntoSquareSet):
         self.mask |= SquareSet(other).mask
         return self
 
@@ -4108,21 +4105,21 @@ class SquareSet:
         for other in others:
             self &= other
 
-    def __iand__(self, other: IntoSquareSet) -> SquareSet:
+    def __iand__(self, other: IntoSquareSet):
         self.mask &= SquareSet(other).mask
         return self
 
     def difference_update(self, other: IntoSquareSet) -> None:
         self -= other
 
-    def __isub__(self, other: IntoSquareSet) -> SquareSet:
+    def __isub__(self, other: IntoSquareSet):
         self.mask &= ~SquareSet(other).mask
         return self
 
     def symmetric_difference_update(self, other: IntoSquareSet) -> None:
         self ^= other
 
-    def __ixor__(self, other: IntoSquareSet) -> SquareSet:
+    def __ixor__(self, other: IntoSquareSet):
         self.mask ^= SquareSet(other).mask
         return self
 
@@ -4161,7 +4158,7 @@ class SquareSet:
         """Iterator over the subsets of this set."""
         return _carry_rippler(self.mask)
 
-    def mirror(self) -> SquareSet:
+    def mirror(self):
         """Returns a vertically mirrored copy of this square set."""
         return SquareSet(flip_vertical(self.mask))
 
@@ -4181,21 +4178,21 @@ class SquareSet:
         except (TypeError, ValueError):
             return NotImplemented
 
-    def __lshift__(self, shift: int) -> SquareSet:
+    def __lshift__(self, shift: int):
         return SquareSet((self.mask << shift) & BB_ALL)
 
-    def __rshift__(self, shift: int) -> SquareSet:
+    def __rshift__(self, shift: int):
         return SquareSet(self.mask >> shift)
 
-    def __ilshift__(self, shift: int) -> SquareSet:
+    def __ilshift__(self, shift: int):
         self.mask = (self.mask << shift) & BB_ALL
         return self
 
-    def __irshift__(self, shift: int) -> SquareSet:
+    def __irshift__(self, shift: int):
         self.mask >>= shift
         return self
 
-    def __invert__(self) -> SquareSet:
+    def __invert__(self):
         return SquareSet(~self.mask & BB_ALL)
 
     def __int__(self) -> int:
@@ -4226,7 +4223,7 @@ class SquareSet:
         return chess.svg.board(squares=self, size=390)
 
     @classmethod
-    def ray(cls, a: Square, b: Square) -> SquareSet:
+    def ray(cls, a: Square, b: Square):
         """
         All squares on the rank, file or diagonal with the two squares, if they
         are aligned.
@@ -4246,7 +4243,7 @@ class SquareSet:
         return cls(ray(a, b))
 
     @classmethod
-    def between(cls, a: Square, b: Square) -> SquareSet:
+    def between(cls, a: Square, b: Square):
         """
         All squares on the rank, file or diagonal between the two squares
         (bounds not included), if they are aligned.
@@ -4266,7 +4263,7 @@ class SquareSet:
         return cls(between(a, b))
 
     @classmethod
-    def from_square(cls, square: Square) -> SquareSet:
+    def from_square(cls, square: Square):
         """
         Creates a :class:`~chess.SquareSet` from a single square.
 
