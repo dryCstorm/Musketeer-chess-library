@@ -1566,7 +1566,7 @@ class PythonTablebase:
             raise KeyError(f"gaviota tables support up to 5 pieces, not {chess.popcount(board.occupied)}: {board.fen()}")
 
         # KvK is a draw.
-        if board.occupied == board.kings:
+        if board.occupied == board.pieces [6]:
             return 0
 
         # Prepare the tablebase request.

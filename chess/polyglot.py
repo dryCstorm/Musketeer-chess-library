@@ -258,7 +258,7 @@ class ZobristHasher:
                 ep_mask = chess.shift_up(chess.BB_SQUARES[board.ep_square])
             ep_mask = chess.shift_left(ep_mask) | chess.shift_right(ep_mask)
 
-            if ep_mask & board.pawns & board.occupied_co[board.turn]:
+            if ep_mask & board.pieces [1] & board.occupied_co[board.turn]:
                 return self.array[772 + chess.square_file(board.ep_square)]
         return 0
 
