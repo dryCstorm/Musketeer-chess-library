@@ -596,6 +596,7 @@ def build_attack_mode (mask, array):
 ATTACK_MODE_PAWN = 1 << 0
 ATTACK_MODE_BISHOP = 1 << 1
 ATTACK_MODE_KNIGHT = [1 << i for i in range(2, 10)]
+ATTACK_MODE_KNIGHT_A = build_attack_mode(0b11111111, ATTACK_MODE_KNIGHT)
 ATTACK_MODE_KNIGHT_FF = build_attack_mode(0b00001010, ATTACK_MODE_KNIGHT)
 ATTACK_MODE_KNIGHT_FS = build_attack_mode(0b00000101, ATTACK_MODE_KNIGHT)
 ATTACK_MODE_KNIGHT_FH = build_attack_mode(0b00001111, ATTACK_MODE_KNIGHT)
@@ -813,7 +814,7 @@ class BaseBoard:
     PIECE_NAMES = [None, "pawn", "knight", "bishop", "rook", "queen", "king"]
     ATTACK_MODES = [None,
                ATTACK_MODE_PAWN,
-               ATTACK_MODE_JOKER_FH,
+               ATTACK_MODE_KNIGHT_A,
                ATTACK_MODE_DIAG,
                ATTACK_MODE_ROOK,
                ATTACK_MODE_DIAG | ATTACK_MODE_ROOK,
@@ -892,13 +893,13 @@ class BaseBoard:
 
         return bb & self.occupied_co[color]
 
-    def pieces(self, piece_type: PieceType, color: Color):
-        """
-        Gets pieces of the given type and color.
+    # def pieces(self, piece_type: PieceType, color: Color):
+    #     """
+    #     Gets pieces of the given type and color.
 
-        Returns a :class:`set of squares <chess.SquareSet>`.
-        """
-        return SquareSet(self.pieces_mask(piece_type, color))
+    #     Returns a :class:`set of squares <chess.SquareSet>`.
+    #     """
+    #     return SquareSet(self.pieces_mask(piece_type, color))
 
     def piece_at(self, square: Square) -> Optional[Piece]:
         """Gets the :class:`piece <chess.Piece>` at the given square."""
