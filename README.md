@@ -17,3 +17,7 @@
 *****
 
 # Musketeer Board
+
+
+# Updated what? = (Guide only for me)
+* **_sliding_attacks** giving one more variable

@@ -21,6 +21,7 @@ import math
 import re
 import itertools
 import typing
+import functools
 
 from typing import ClassVar, Callable, Counter, Dict, Generic, Hashable, Iterable, Iterator, List, Literal, Mapping, Optional, SupportsInt, Tuple, Type, TypeVar, Union
 
@@ -483,15 +484,15 @@ def shift_down_right(b: Bitboard) -> Bitboard:
     return (b >> 7) & ~BB_FILE_A
 
 
-def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) -> Bitboard:
+def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int], max_step) -> Bitboard:
     attacks = BB_EMPTY
 
     for delta in deltas:
         sq = square
 
-        while True:
+        for i in range(0, max_step):
             sq += delta
-            if not (0 <= sq < 64) or square_distance(sq, sq - delta) > 2:
+            if not (0 <= sq < 64) or square_distance(sq, sq - delta) > 3:
                 break
 
             attacks |= BB_SQUARES[sq]
@@ -501,13 +502,8 @@ def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) 
 
     return attacks
 
-def _step_attacks(square: Square, deltas: Iterable[int]) -> Bitboard:
-    return _sliding_attacks(square, BB_ALL, deltas)
-
-BB_KNIGHT_ATTACKS: List[Bitboard] = [_step_attacks(sq, [17, 15, 10, 6, -17, -15, -10, -6]) for sq in SQUARES]
-BB_KING_ATTACKS: List[Bitboard] = [_step_attacks(sq, [9, 8, 7, 1, -9, -8, -7, -1]) for sq in SQUARES]
-BB_PAWN_ATTACKS: List[List[Bitboard]] = [[_step_attacks(sq, deltas) for sq in SQUARES] for deltas in [[-7, -9], [7, 9]]]
-
+def _step_attacks(square: Square, deltas: Iterable[int], max_step) -> Bitboard:
+    return _sliding_attacks(square, BB_ALL, deltas, max_step)
 
 def _edges(square: Square) -> Bitboard:
     return (((BB_RANK_1 | BB_RANK_8) & ~BB_RANKS[square_rank(square)]) |
@@ -522,33 +518,104 @@ def _carry_rippler(mask: Bitboard) -> Iterator[Bitboard]:
         if not subset:
             break
 
-def _attack_table(deltas: List[int]) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
+def _attack_table(deltas: List[int], max_step) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
     mask_table: List[Bitboard] = []
     attack_table: List[Dict[Bitboard, Bitboard]] = []
 
     for square in SQUARES:
         attacks = {}
 
-        mask = _sliding_attacks(square, 0, deltas) & ~_edges(square)
+        mask = _sliding_attacks(square, 0, deltas, max_step) & ~_edges(square)
         for subset in _carry_rippler(mask):
-            attacks[subset] = _sliding_attacks(square, subset, deltas)
+            attacks[subset] = _sliding_attacks(square, subset, deltas, max_step)
 
         attack_table.append(attacks)
         mask_table.append(mask)
 
     return mask_table, attack_table
 
-BB_DIAG_MASKS, BB_DIAG_ATTACKS = _attack_table([-9, -7, 7, 9])
-BB_FILE_MASKS, BB_FILE_ATTACKS = _attack_table([-8, 8])
-BB_RANK_MASKS, BB_RANK_ATTACKS = _attack_table([-1, 1])
+# FB is_front
+# LR is_left
+# SN is_side
+
+
+# For Black
+#   4 | 3
+#   -----
+#   2 | 1
+
+# For White
+#   1 | 2
+#   -----
+#   3 | 4
+
+def get_index (FB, LR, SN):
+    return FB << 4 + LR << 2 + SN
+
+BB_KNIGHT_ATTACKS: List[List[List[Bitboard]]] = [[[_step_attacks(sq, [mv], 1) for sq in SQUARES] 
+                                                for mv in deltas] 
+                                                for deltas in [[17, 10, 15, 6, -17, -10, -15, -6], [-15, -6, -17, -10, 15, 6, 17, 10]]]
+
+BB_LONG_KNIGHT_ATTACKS: List[List[List[Bitboard]]] = [[[_step_attacks(sq, [mv], 1) for sq in SQUARES] 
+                                                for mv in deltas] 
+                                                for deltas in [[25, 11, 23, 5, -25, -11, -23, -5], [-23, -5, -25, -11, 23, 5, 25, 11]]]
+
+BB_JOKER_ATTACKS: List[List[List[Bitboard]]] = [[[_step_attacks(sq, [mv], 1) for sq in SQUARES] 
+                                                for mv in deltas] 
+                                                for deltas in [[26, 19, 22, 13, -26, -19, -22, -13], [-22, -13, -26, -19, 22, 13, 26, 19]]]
+
+BB_KING_ATTACKS: List[Bitboard] = [_step_attacks(sq, [9, 8, 7, 1, -9, -8, -7, -1], 1) for sq in SQUARES]
+BB_PAWN_ATTACKS: List[List[Bitboard]] = [[_step_attacks(sq, deltas, 1) for sq in SQUARES] for deltas in [[-7, -9], [7, 9]]]
+
+BB_DIAG_MASKS, BB_DIAG_ATTACKS = _attack_table([-9, -7, 7, 9], 8)
+BB_FILE_MASKS, BB_FILE_ATTACKS = _attack_table([-8, 8], 8)
+BB_RANK_MASKS, BB_RANK_ATTACKS = _attack_table([-1, 1], 8)
+BB_ROOK_MASKS, BB_ROOK_ATTACKS = _attack_table([-8, 8, -1, 1], 8)
+
+print (len(BB_DIAG_MASKS), len(BB_DIAG_ATTACKS))
+
+# [F/B][L/R][S/n-S]
+FRONT = True
+BACK = False
+LEFT = True
+RIGHT = False
+SIDE = True
+NSIDE = False
+
+
+# For Black
+#   6 7 | 4 5
+#   ---------
+#   2 3 | 0 1
+#   NON-SIDED SIDED
+
+def build_attack_mode (mask, array):
+    res = 0
+    for i in range(0, len(array)):
+        res |= array [i] if mask & (1 << (len(array) - 1 - i)) else 0
+    return res
 
 ATTACK_MODE_PAWN = 1 << 0
-ATTACK_MODE_KNIGHT = 1 << 1
-ATTACK_MODE_BISHOP = 1 << 2
-ATTACK_MODE_RANK = 1 << 3
-ATTACK_MODE_FILE = 1 << 4
-ATTACK_MODE_DIAG = 1 << 5
-ATTACK_MODE_KING = 1 << 6
+ATTACK_MODE_BISHOP = 1 << 1
+ATTACK_MODE_KNIGHT = [1 << i for i in range(2, 10)]
+ATTACK_MODE_KNIGHT_FF = build_attack_mode(0b00001010, ATTACK_MODE_KNIGHT)
+ATTACK_MODE_KNIGHT_FS = build_attack_mode(0b00000101, ATTACK_MODE_KNIGHT)
+ATTACK_MODE_KNIGHT_FH = build_attack_mode(0b00001111, ATTACK_MODE_KNIGHT)
+ATTACK_MODE_LONG_KNIGHT = [1 << i for i in range(10, 18)]
+ATTACK_MODE_LONG_KNIGHT_FF = build_attack_mode(0b00001010, ATTACK_MODE_LONG_KNIGHT)
+ATTACK_MODE_LONG_KNIGHT_FS = build_attack_mode(0b00000101, ATTACK_MODE_LONG_KNIGHT)
+ATTACK_MODE_LONG_KNIGHT_FH = build_attack_mode(0b00001111, ATTACK_MODE_LONG_KNIGHT)
+ATTACK_MODE_JOKER = [1 << i for i in range(18, 26)]
+ATTACK_MODE_JOKER_FF = build_attack_mode(0b00001010, ATTACK_MODE_JOKER)
+ATTACK_MODE_JOKER_FS = build_attack_mode(0b00000101, ATTACK_MODE_JOKER)
+ATTACK_MODE_JOKER_FH = build_attack_mode(0b00001111, ATTACK_MODE_JOKER)
+# [F/B][L/R][LEN]
+
+ATTACK_MODE_KING = 1 << 26
+ATTACK_MODE_DIAG = 1 << 27
+ATTACK_MODE_RANK = 1 << 28
+ATTACK_MODE_FILE = 1 << 29
+ATTACK_MODE_ROOK = 1 << 30
 
 def _rays() -> List[List[Bitboard]]:
     rays: List[List[Bitboard]] = []
@@ -557,10 +624,12 @@ def _rays() -> List[List[Bitboard]]:
         for b, bb_b in enumerate(BB_SQUARES):
             if BB_DIAG_ATTACKS[a][0] & bb_b:
                 rays_row.append((BB_DIAG_ATTACKS[a][0] & BB_DIAG_ATTACKS[b][0]) | bb_a | bb_b)
-            elif BB_RANK_ATTACKS[a][0] & bb_b:
-                rays_row.append(BB_RANK_ATTACKS[a][0] | bb_a)
-            elif BB_FILE_ATTACKS[a][0] & bb_b:
-                rays_row.append(BB_FILE_ATTACKS[a][0] | bb_a)
+            #elif BB_RANK_ATTACKS[a][0] & bb_b:
+                #rays_row.append(BB_RANK_ATTACKS[a][0] | bb_a)
+            #elif BB_FILE_ATTACKS[a][0] & bb_b:
+                #rays_row.append(BB_FILE_ATTACKS[a][0] | bb_a)
+            elif BB_ROOK_ATTACKS[a][0] & bb_b:
+                rays_row.append(BB_ROOK_ATTACKS[a][0] | bb_a)
             else:
                 rays_row.append(BB_EMPTY)
         rays.append(rays_row)
@@ -750,7 +819,7 @@ class BaseBoard:
     PIECE_NAMES = [None, "pawn", "knight", "bishop", "rook", "queen", "king"]
     ATTACK_MODES = [None,
                ATTACK_MODE_PAWN,
-               ATTACK_MODE_KNIGHT,
+               ATTACK_MODE_JOKER_FH,
                ATTACK_MODE_DIAG,
                ATTACK_MODE_RANK | ATTACK_MODE_FILE,
                ATTACK_MODE_DIAG | ATTACK_MODE_RANK | ATTACK_MODE_FILE,
@@ -886,17 +955,30 @@ class BaseBoard:
         for i in range (1, len(self.PIECE_TYPES) + 1):
             if bb_square & self.pieces [i]:
                 attacks = 0
+                color = bool(bb_square & self.occupied_co[WHITE])
                 if self.ATTACK_MODES [i] & ATTACK_MODE_PAWN:
-                    color = bool(bb_square & self.occupied_co[WHITE])
                     attacks |= BB_PAWN_ATTACKS[color][square]
-                if self.ATTACK_MODES [i] & ATTACK_MODE_KNIGHT:
-                    attacks |= BB_KNIGHT_ATTACKS[square]
+                    
+                for (mode_id, mode) in enumerate (ATTACK_MODE_KNIGHT):
+                    if self.ATTACK_MODES [i] & mode:
+                        attacks |= BB_KNIGHT_ATTACKS[color][mode_id][square]
+                        
+                for (mode_id, mode) in enumerate (ATTACK_MODE_LONG_KNIGHT):
+                    if self.ATTACK_MODES [i] & mode:
+                        attacks |= BB_LONG_KNIGHT_ATTACKS[color][mode_id][square]
+                        
+                for (mode_id, mode) in enumerate (ATTACK_MODE_JOKER):
+                    if self.ATTACK_MODES [i] & mode:
+                        attacks |= BB_JOKER_ATTACKS[color][mode_id][square]
+                        
                 if self.ATTACK_MODES [i] & ATTACK_MODE_DIAG:
                     attacks |= BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied]
-                if self.ATTACK_MODES [i] & ATTACK_MODE_FILE:
-                    attacks |= BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied]
-                if self.ATTACK_MODES [i] & ATTACK_MODE_RANK:
-                    attacks |= BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]
+                #if self.ATTACK_MODES [i] & ATTACK_MODE_FILE:
+                #    attacks |= BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied]
+                #if self.ATTACK_MODES [i] & ATTACK_MODE_RANK:
+                #    attacks |= BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]
+                if self.ATTACK_MODES [i] & ATTACK_MODE_ROOK:
+                    attacks |= BB_ROOK_ATTACKS[square][BB_ROOK_MASKS[square] & self.occupied]
                 if self.ATTACK_MODES [i] & ATTACK_MODE_KING:
                     attacks |= BB_KING_ATTACKS[square]
                 return attacks
@@ -923,8 +1005,18 @@ class BaseBoard:
             temp_attackers = 0
             if self.ATTACK_MODES [i] & ATTACK_MODE_PAWN:
                 temp_attackers |= BB_PAWN_ATTACKS[not color][square]
-            if self.ATTACK_MODES [i] & ATTACK_MODE_KNIGHT:
-                temp_attackers |= BB_KNIGHT_ATTACKS [square]
+            for (mode_id, mode) in enumerate (ATTACK_MODE_KNIGHT):
+                if self.ATTACK_MODES [i] & mode:
+                    temp_attackers |= BB_KNIGHT_ATTACKS[color][mode_id][square]
+                    
+            for (mode_id, mode) in enumerate (ATTACK_MODE_LONG_KNIGHT):
+                if self.ATTACK_MODES [i] & mode:
+                    temp_attackers |= BB_LONG_KNIGHT_ATTACKS[color][mode_id][square]
+                    
+            for (mode_id, mode) in enumerate (ATTACK_MODE_JOKER):
+                if self.ATTACK_MODES [i] & mode:
+                    temp_attackers |= BB_JOKER_ATTACKS[color][mode_id][square]
+                    
             if self.ATTACK_MODES [i] & ATTACK_MODE_FILE:
                 temp_attackers |= BB_FILE_ATTACKS [square][file_pieces]
             if self.ATTACK_MODES [i] & ATTACK_MODE_RANK:
