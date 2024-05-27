@@ -568,8 +568,6 @@ BB_KING_ATTACKS: List[Bitboard] = [_step_attacks(sq, [9, 8, 7, 1, -9, -8, -7, -1
 BB_PAWN_ATTACKS: List[List[Bitboard]] = [[_step_attacks(sq, deltas, 1) for sq in SQUARES] for deltas in [[-7, -9], [7, 9]]]
 
 BB_DIAG_MASKS, BB_DIAG_ATTACKS = _attack_table([-9, -7, 7, 9], 8)
-BB_FILE_MASKS, BB_FILE_ATTACKS = _attack_table([-8, 8], 8)
-BB_RANK_MASKS, BB_RANK_ATTACKS = _attack_table([-1, 1], 8)
 BB_ROOK_MASKS, BB_ROOK_ATTACKS = _attack_table([-8, 8, -1, 1], 8)
 
 print (len(BB_DIAG_MASKS), len(BB_DIAG_ATTACKS))
@@ -624,10 +622,6 @@ def _rays() -> List[List[Bitboard]]:
         for b, bb_b in enumerate(BB_SQUARES):
             if BB_DIAG_ATTACKS[a][0] & bb_b:
                 rays_row.append((BB_DIAG_ATTACKS[a][0] & BB_DIAG_ATTACKS[b][0]) | bb_a | bb_b)
-            #elif BB_RANK_ATTACKS[a][0] & bb_b:
-                #rays_row.append(BB_RANK_ATTACKS[a][0] | bb_a)
-            #elif BB_FILE_ATTACKS[a][0] & bb_b:
-                #rays_row.append(BB_FILE_ATTACKS[a][0] | bb_a)
             elif BB_ROOK_ATTACKS[a][0] & bb_b:
                 rays_row.append(BB_ROOK_ATTACKS[a][0] | bb_a)
             else:
@@ -821,8 +815,8 @@ class BaseBoard:
                ATTACK_MODE_PAWN,
                ATTACK_MODE_JOKER_FH,
                ATTACK_MODE_DIAG,
-               ATTACK_MODE_RANK | ATTACK_MODE_FILE,
-               ATTACK_MODE_DIAG | ATTACK_MODE_RANK | ATTACK_MODE_FILE,
+               ATTACK_MODE_ROOK,
+               ATTACK_MODE_DIAG | ATTACK_MODE_ROOK,
                ATTACK_MODE_KING]
     
     custom_params = []
@@ -973,12 +967,10 @@ class BaseBoard:
                         
                 if self.ATTACK_MODES [i] & ATTACK_MODE_DIAG:
                     attacks |= BB_DIAG_ATTACKS[square][BB_DIAG_MASKS[square] & self.occupied]
-                #if self.ATTACK_MODES [i] & ATTACK_MODE_FILE:
-                #    attacks |= BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied]
-                #if self.ATTACK_MODES [i] & ATTACK_MODE_RANK:
-                #    attacks |= BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]
+                    
                 if self.ATTACK_MODES [i] & ATTACK_MODE_ROOK:
                     attacks |= BB_ROOK_ATTACKS[square][BB_ROOK_MASKS[square] & self.occupied]
+                    
                 if self.ATTACK_MODES [i] & ATTACK_MODE_KING:
                     attacks |= BB_KING_ATTACKS[square]
                 return attacks
@@ -996,8 +988,7 @@ class BaseBoard:
         return SquareSet(self.attacks_mask(square))
 
     def _attackers_mask(self, color: Color, square: Square, occupied: Bitboard) -> Bitboard:
-        rank_pieces = BB_RANK_MASKS[square] & occupied
-        file_pieces = BB_FILE_MASKS[square] & occupied
+        rook_pieces = BB_ROOK_MASKS[square] & occupied
         diag_pieces = BB_DIAG_MASKS[square] & occupied
 
         attackers = 0
@@ -1017,12 +1008,8 @@ class BaseBoard:
                 if self.ATTACK_MODES [i] & mode:
                     temp_attackers |= BB_JOKER_ATTACKS[color][mode_id][square]
                     
-            if self.ATTACK_MODES [i] & ATTACK_MODE_FILE:
-                temp_attackers |= BB_FILE_ATTACKS [square][file_pieces]
-            if self.ATTACK_MODES [i] & ATTACK_MODE_RANK:
-                temp_attackers |= BB_RANK_ATTACKS [square][rank_pieces]
-            if self.ATTACK_MODES [i] & ATTACK_MODE_DIAG:
-                temp_attackers |= BB_DIAG_ATTACKS [square][diag_pieces]
+            if self.ATTACK_MODES [i] & ATTACK_MODE_ROOK:
+                temp_attackers |= BB_ROOK_ATTACKS [square][rook_pieces]
             attackers |= temp_attackers & self.pieces[i]
          
         return attackers & self.occupied_co[color]
@@ -3708,8 +3695,7 @@ class Board(BaseBoard):
         rooks_and_queens = self.pieces [4] | self.pieces [5]
         bishops_and_queens = self.pieces [3] | self.pieces [5]
 
-        snipers = ((BB_RANK_ATTACKS[king][0] & rooks_and_queens) |
-                   (BB_FILE_ATTACKS[king][0] & rooks_and_queens) |
+        snipers = ((BB_ROOK_ATTACKS[king][0] & rooks_and_queens) |
                    (BB_DIAG_ATTACKS[king][0] & bishops_and_queens))
 
         blockers = 0
