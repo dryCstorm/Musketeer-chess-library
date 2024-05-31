@@ -482,6 +482,9 @@ class BaseBoard:
                        BB_CORNERS,
                        BB_D1 | BB_D8,
                        BB_E1 | BB_E8]
+        
+        while len(self.pieces) < len(self.PIECE_TYPES) + 1:
+            self.pieces.append(BB_EMPTY)
 
         self.promoted = BB_EMPTY
 
@@ -507,6 +510,8 @@ class BaseBoard:
                        BB_EMPTY,
                        BB_EMPTY,
                        BB_EMPTY]
+        while len(self.pieces) < len(self.PIECE_TYPES) + 1:
+            self.pieces.append(BB_EMPTY)
 
         self.promoted = BB_EMPTY
 
