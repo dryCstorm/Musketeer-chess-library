@@ -27,6 +27,7 @@ class MusketeerBoard(Board):
         for i, custom_param in enumerate(self.custom_params):
             custom_param.setdefault("current_position", custom_param ["position"].copy())
             custom_param.setdefault("piece_id", len(self.PIECE_TYPES) + i + 1)
+            custom_param ["current_position"] = custom_param ["position"].copy()
         
         super().__init__(fen)
         
