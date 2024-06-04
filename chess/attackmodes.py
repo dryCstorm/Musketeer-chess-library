@@ -7,7 +7,6 @@ def build_am (mask, mask_length, array, reach_length = MAX_LEN):
     step = int(len(array) / mask_length)
     for i in range(0, mask_length):
         for j in range(0, min(step, reach_length)):
-            #print ("================ ", i, j, mask_length, i * step + j, len(array))
             res |= array [i * step + j] if mask & (1 << (mask_length - 1 - i)) else 0
     return res
 

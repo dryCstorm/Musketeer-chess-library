@@ -476,6 +476,7 @@ class BaseBoard:
             self._set_board_fen(board_fen)
 
     def _reset_board(self) -> None:
+        print ("=================== Reset Board =======================")
         self.pieces = [None, BB_RANK_2 | BB_RANK_7,
                        BB_B1 | BB_G1 | BB_B8 | BB_G8,
                        BB_C1 | BB_F1 | BB_C8 | BB_F8,
@@ -503,6 +504,7 @@ class BaseBoard:
         self._reset_board()
 
     def _clear_board(self) -> None:
+        print ("=================== Clear Board =======================")
         self.pieces = [None,
                        BB_EMPTY,
                        BB_EMPTY,
@@ -1149,6 +1151,8 @@ class BaseBoard:
         """Creates a copy of the board."""
         board = type(self)(None)
 
+        print ("=================== Copy Board =======================")
+        
         board.pieces = self.pieces.copy()
 
         board.occupied_co[WHITE] = self.occupied_co[WHITE]
@@ -1211,6 +1215,7 @@ class _BoardState(Generic[BoardT]):
         self.custom_params = board.custom_params.copy()
 
     def restore(self, board: BoardT) -> None:
+        print ("=================== Board State Restore =======================")
         board.pieces = self.pieces.copy()
 
         board.occupied_co[WHITE] = self.occupied_w

@@ -11,6 +11,7 @@ import typing
 import chess
 import chess.engine
 import chess.svg
+from .musketeer import MusketeerBoard
 
 from typing import Any, Callable, Dict, Generic, Iterable, Iterator, List, Literal, Mapping, MutableMapping, Set, TextIO, Tuple, Type, TypeVar, Optional, Union
 from chess import Color, Square
@@ -866,7 +867,10 @@ class Game(GameNode):
             self.headers["Variant"] = "Chess960"
         elif type(setup).aliases[0] != "Standard":
             self.headers["Variant"] = type(setup).aliases[0]
-            self.headers["FEN"] = fen
+            if self.headers["Variant"] != "Musketeer":
+                self.headers["FEN"] = fen
+            else:               
+                self.headers["MusketeerPiece"] = board.generate_header()
         else:
             self.headers.pop("Variant", None)
 
@@ -975,13 +979,17 @@ class Headers(MutableMapping[str, str]):
         if "Variant" not in self or self.is_chess960() or self.is_wild():
             return chess.Board
         else:
-            from chess.variant import find_variant
+            from .variant import find_variant
             return find_variant(self["Variant"])
 
     def board(self) -> chess.Board:
         VariantBoard = self.variant()
         fen = self.get("FEN", VariantBoard.starting_fen)
-        board = VariantBoard(fen, chess960=self.is_chess960())
+        board = None
+        if (VariantBoard == MusketeerBoard):
+            board = VariantBoard(MusketeerBoard.parse_header(self ["MusketeerPiece"]), fen, chess960=self.is_chess960())
+        else:
+            board = VariantBoard(fen, chess960=self.is_chess960())
         board.chess960 = board.chess960 or board.has_chess960_castling_rights()
         return board
 
@@ -1622,8 +1630,12 @@ def read_game(handle: TextIO, *, Visitor: Any = GameBuilder) -> Any:
 
         # Initial position.
         fen = headers.get("FEN", VariantBoard.starting_fen)
+        board = None
         try:
-            board = VariantBoard(fen, chess960=headers.is_chess960())
+            if VariantBoard == MusketeerBoard:
+                board = VariantBoard(MusketeerBoard.parse_header(headers ["MusketeerPiece"]), fen, chess960=headers.is_chess960())
+            else:
+                board = VariantBoard(fen, chess960=headers.is_chess960())
         except ValueError as error:
             visitor.handle_error(error)
             skipping_game = True
@@ -1662,6 +1674,7 @@ def read_game(handle: TextIO, *, Visitor: Any = GameBuilder) -> Any:
     skip_variation_depth = 0
     fresh_line = True
     while line:
+        print ("???????????? ", line)
         if fresh_line:
             # Ignore comments.
             if line.startswith("%") or line.startswith(";"):
@@ -1863,3 +1876,24 @@ def parse_time_control(time_control: str) -> TimeControl:
         tc.type = TimeControlType.STANDARD
 
     return tc
+
+def save_game(handle: TextIO, game : Game, moves : str):
+    """
+    Save the current state and the array of moves into pgn file
+    mainly written for musketeer chess 1.0
+
+    game: current Game Variable
+    moves: string of the movement stack
+    """
+    
+    # Write the game headers
+    for key, value in game.headers.items():
+        handle.write(f"[{key} \"{value}\"]\n")
+
+    # Write the moves
+    handle.write("\n")
+    handle.write(moves)
+    
+    
+def display_node (node:ChildNode):
+    iter(itertools.islice(node.parent.variations, 1, None) if sidelines else [])

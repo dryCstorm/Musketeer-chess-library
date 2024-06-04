@@ -1,6 +1,6 @@
 from chess import PieceType, Square
+from .variant import *
 from . import *
-
 
 class MusketeerBoard(Board):
     # custom_pieces example
@@ -17,18 +17,34 @@ class MusketeerBoard(Board):
     #   init_position: [6, 4]
     # }
     # ]
+    aliases = ["Musketeer", "Musketeer", "Musket", "MT"]
+    uci_variant = "musketeer"
+    xboard_variant = "musketeer"
     
     def build_am(self, betza):
         return build_am_from_betza(betza)     
         
     def __init__(self: BoardT, custom_pieces, fen: Optional[str] = STARTING_FEN, *, chess960: bool = False):
-        self.custom_params = custom_pieces.copy()
+        print ("==================== Board Init ====================")
+        print (custom_pieces)
+        self.custom_params = [one.copy() for one in custom_pieces]
         
         for i, custom_param in enumerate(self.custom_params):
             custom_param.setdefault("current_position", custom_param ["position"].copy())
             custom_param.setdefault("piece_id", len(self.PIECE_TYPES) + i + 1)
             custom_param ["current_position"] = custom_param ["position"].copy()
         
+        self.PIECE_TYPES = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING]
+        self.PIECE_SYMBOLS = [None, "p", "n", "b", "r", "q", "k"]
+        self.PIECE_NAMES = [None, "pawn", "knight", "bishop", "rook", "queen", "king"]
+        self.ATTACK_MODES = [None,
+            ATTACK_MODE_PAWN,
+            build_am(KNIGHT_A, 8, ATTACK_MODE_KNIGHT),
+            build_am(DIAG_A, 4, ATTACK_MODE_DIAG),
+            build_am(ROOK_A, 4, ATTACK_MODE_ROOK),
+            build_am(DIAG_A, 4, ATTACK_MODE_DIAG) | build_am(ROOK_A, 4, ATTACK_MODE_ROOK),
+            ATTACK_MODE_KING]
+    
         for custom_param in self.custom_params:
             self.PIECE_TYPES.append(custom_param["piece_id"])
             self.PIECE_SYMBOLS.append(custom_param["letter"].lower())
@@ -74,7 +90,6 @@ class MusketeerBoard(Board):
         return res
     
     def _set_board_fen(self, fen: str) -> None:
-        print("fen : ", fen)
         # Compatibility with set_fen().
         fen = fen.strip()
         if " " in fen:
@@ -193,3 +208,54 @@ class MusketeerBoard(Board):
                 wfen = wfen[:index] + custom_param["letter"] + wfen[index+1:]
         builder.append(wfen)
         return "".join(builder)
+    
+    def generate_header (self):
+        res = []
+        for custom_piece in self.custom_params:
+            res.append("##".join([custom_piece ["name"], custom_piece ["letter"], custom_piece ["betza"],  custom_piece ["icon"],  str(custom_piece ["position"][0]), str(custom_piece ["position"][1])]))
+
+        return "|".join(res)
+            
+    def parse_header(header):
+        pieces = header.split("|")
+        res = []
+        for one in pieces:
+            splited = one.split("##")
+            one_piece = {}
+            one_piece.setdefault("name", splited [0])
+            one_piece.setdefault("letter", splited [1])
+            one_piece.setdefault("betza", splited [2])
+            one_piece.setdefault("icon", splited [3])
+            one_piece.setdefault("position", [int(splited [4]), int(splited [5])])
+            res.append(one_piece)
+        return res
+        
+    def get_icon_mapper(self):
+        res = {}
+        for custom_piece in self.custom_params:
+            res.setdefault(custom_piece["letter"], custom_piece ["icon"])
+        return res
+    
+    def copy(self: BaseBoardT) -> BaseBoardT:
+        """Creates a copy of the board."""
+        if type(self) == MusketeerBoard:
+            board = type(self)(self.custom_params)
+        else:
+            board = type(self)(None)
+        
+        board.pieces = self.pieces.copy()
+
+        board.occupied_co[WHITE] = self.occupied_co[WHITE]
+        board.occupied_co[BLACK] = self.occupied_co[BLACK]
+        board.occupied = self.occupied
+        board.promoted = self.promoted
+
+        return board
+    
+    def pop(self: BoardT):
+        if len(self.move_stack) > 0:
+            super().pop()
+        return None
+        
+    
+VARIANTS.append(MusketeerBoard)
